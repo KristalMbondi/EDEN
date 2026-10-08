@@ -6,10 +6,11 @@ import '../../core/config/app_config.dart';
 import '../../core/l10n/app_localizations.dart';
 import '../../providers.dart';
 import '../common/ui_helpers.dart';
+import 'phone_screen.dart';
 
 /// Étape 2 : code OTP reçu par SMS (CdC §2.2).
-/// Après validation, le routeur redirige automatiquement vers le
-/// consentement puis l'accueil (voir app_router.dart).
+/// Après validation, le routeur redirige automatiquement vers l'écran
+/// « Bienvenue » (prénom + consentement) puis l'accueil.
 class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({super.key, required this.phone});
 
@@ -45,31 +46,32 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(context.tr('otp_title'))),
-      body: ListView(
-        padding: const EdgeInsets.all(24),
+      body: AuthLayout(
+        showBack: true,
+        title: context.tr('otp_title'),
+        subtitle: context.tr('otp_sent_to', {'phone': '+237 ${widget.phone}'}),
         children: [
-          Text(context.tr('otp_sent_to', {'phone': '+237 ${widget.phone}'})),
           if (AppConfig.useMock) ...[
-            const SizedBox(height: 8),
             InfoBanner(text: context.tr('otp_demo_hint', {'code': AppConfig.demoOtpCode})),
+            const SizedBox(height: 20),
           ],
-          const SizedBox(height: 24),
           TextField(
             controller: _controller,
             keyboardType: TextInputType.number,
             maxLength: 6,
+            autofocus: true,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 28, letterSpacing: 12),
-            decoration: const InputDecoration(counterText: ''),
+            style: const TextStyle(fontSize: 28, letterSpacing: 14, fontWeight: FontWeight.w600),
+            decoration: const InputDecoration(counterText: '', hintText: '••••••'),
             onSubmitted: (_) => _verify(),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           FilledButton(
             onPressed: _loading ? null : _verify,
             child: Text(context.tr('otp_verify')),
           ),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: _loading
                 ? null

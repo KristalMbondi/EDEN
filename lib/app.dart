@@ -16,6 +16,8 @@ class EdenPassagerApp extends ConsumerWidget {
       title: 'TACO EDEN',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system, // suit le réglage du téléphone
       routerConfig: ref.watch(routerProvider),
       locale: ref.watch(localeProvider), // null = langue du téléphone
       supportedLocales: AppLocalizations.supportedLocales,

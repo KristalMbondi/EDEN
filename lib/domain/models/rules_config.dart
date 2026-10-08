@@ -5,7 +5,9 @@
 /// le backend reste la seule source de vérité pour le prix et les frais.
 library;
 
-/// Tarification (CdC §3.1) :
+import 'vehicle_category.dart';
+
+/// Tarification (CdC §3.1), appliquée SÉPARÉMENT à chaque gamme :
 /// Prix = frais_prise_en_charge + (tarif_km × distance)
 /// Prix appliqué = max(Prix calculé, prix_minimum)
 class PricingConfig {
@@ -63,19 +65,53 @@ class EmergencyCreditConfig {
   });
 }
 
+/// Réservation à l'avance (DÉCISION du 08/10/2026, hors CdC v1.0).
+class ReservationConfig {
+  /// Délai minimum entre la réservation et le départ : 1 h.
+  final Duration minLead;
+
+  /// Délai maximum : 24 h.
+  final Duration maxLead;
+
+  /// Alerte « solde insuffisant » envoyée 30 min avant le départ.
+  final Duration balanceAlertBefore;
+
+  /// Recherche du chauffeur lancée 15 min avant le départ ; si le solde est
+  /// toujours insuffisant à ce moment, la réservation est annulée sans frais.
+  final Duration searchStartBefore;
+
+  const ReservationConfig({
+    this.minLead = const Duration(hours: 1),
+    this.maxLead = const Duration(hours: 24),
+    this.balanceAlertBefore = const Duration(minutes: 30),
+    this.searchStartBefore = const Duration(minutes: 15),
+  });
+}
+
 /// Regroupe toute la configuration lue par l'application passager.
 class AppRulesConfig {
-  final PricingConfig pricing;
+  /// Tarifs SÉPARÉS par gamme (décision du 08/10/2026).
+  final Map<VehicleCategory, PricingConfig> pricingByCategory;
   final CancellationConfig cancellation;
   final EmergencyCreditConfig emergencyCredit;
+  final ReservationConfig reservation;
 
   /// Recherche chauffeur : timeout de 60 secondes (CdC §2.2).
   final Duration searchTimeout;
 
   const AppRulesConfig({
-    required this.pricing,
+    required this.pricingByCategory,
     required this.cancellation,
     required this.emergencyCredit,
+    this.reservation = const ReservationConfig(),
     this.searchTimeout = const Duration(seconds: 60),
   });
+
+  PricingConfig pricingFor(VehicleCategory category) {
+    final p = pricingByCategory[category];
+    if (p == null) {
+      throw StateError('Aucun tarif configuré pour la gamme $category');
+    }
+    return p;
+  }
 }

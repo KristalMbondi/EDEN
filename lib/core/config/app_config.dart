@@ -2,6 +2,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../domain/models/place.dart';
 import '../../domain/models/rules_config.dart';
+import '../../domain/models/vehicle_category.dart';
 
 /// Configuration de l'application.
 ///
@@ -28,18 +29,30 @@ class AppConfig {
 
   /// Règles de démonstration — VALEURS FICTIVES, NON VALIDÉES.
   static const AppRulesConfig demoRules = AppRulesConfig(
-    pricing: PricingConfig(
-      pickupFee: 500,
-      perKm: 250,
-      minimumFare: 1000,
-      overrunAlertPercent: 30, // ce seuil-là vient du CdC §2.2
-    ),
+    // Tarifs séparés par gamme (décision du 08/10/2026) — montants FICTIFS.
+    pricingByCategory: {
+      VehicleCategory.eco: PricingConfig(
+        pickupFee: 500,
+        perKm: 250,
+        minimumFare: 1000,
+        overrunAlertPercent: 30, // ce seuil-là vient du CdC §2.2
+      ),
+      VehicleCategory.confort: PricingConfig(
+        pickupFee: 800,
+        perKm: 350,
+        minimumFare: 1500,
+        overrunAlertPercent: 30,
+      ),
+    },
     cancellation: CancellationConfig(
       freeWindow: Duration(minutes: 3), // CdC §3.2
       feePerMinute: 50, // FICTIF
       capMinutes: 10, // CdC §3.2
     ),
     emergencyCredit: EmergencyCreditConfig(maxAmount: 2000), // FICTIF
+    // Fenêtre 1 h – 24 h, alerte 30 min avant, recherche 15 min avant
+    // (décision du 08/10/2026).
+    reservation: ReservationConfig(),
     searchTimeout: Duration(seconds: 60), // CdC §2.2
   );
 

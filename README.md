@@ -1,6 +1,8 @@
 # EDEN Mobility — Application passager (Flutter)
 
-Application mobile **passager** du service VTC de TACO EDEN MOBILITY, construite à partir du **cahier des charges v1.0 (10/08/2026)** : inscription par OTP, wallet prépayé (Orange Money / MTN MoMo), crédit d'urgence, commande de course, suivi temps réel, SOS, fin de course avec notation, historique et reçus. Bilingue **français / anglais**.
+Application mobile **passager** du service VTC de TACO EDEN MOBILITY, construite à partir du **cahier des charges v1.0 (10/08/2026)** : inscription par OTP, wallet prépayé (Orange Money / MTN MoMo), crédit d'urgence, commande de course, suivi temps réel, SOS, fin de course avec notation, historique et reçus. Bilingue **français / anglais**, thèmes clair et sombre.
+
+**Refonte du 08/10/2026** (hors cahier des charges, voir `docs/SPEC_APP_PASSAGER.md` §9) : couleurs du logo, police Poppins, écrans d'introduction, accueil « Bonjour [prénom] », lieux favoris, gammes **Éco / Confort**, **réservation** de 1 h à 24 h à l'avance.
 
 Elle fonctionne **dès maintenant, sans backend**, grâce à un faux serveur en mémoire (`MockBackend`). Le jour où l'API NestJS existe, on remplace 3 providers. Aucun écran ne change.
 
@@ -11,7 +13,7 @@ Elle fonctionne **dès maintenant, sans backend**, grâce à un faux serveur en 
 
 ## 1. Démarrer (Windows)
 
-Versions supposées : **Flutter ≥ 3.22 / Dart ≥ 3.4**. Paquets : `flutter_launcher_icons ^0.13.1` (icônes), `flutter_riverpod ^2.5.1`, `go_router ^14.2.0`, `flutter_map ^7.0.2`, `latlong2 ^0.9.1`, `geolocator ^13.0.1`, `url_launcher ^6.3.0`.
+Versions supposées : **Flutter ≥ 3.22 / Dart ≥ 3.4**. Paquets : `flutter_launcher_icons ^0.13.1` (icônes), `shared_preferences ^2.2.3`, `flutter_riverpod ^2.5.1`, `go_router ^14.2.0`, `flutter_map ^7.0.2`, `latlong2 ^0.9.1`, `geolocator ^13.0.1`, `url_launcher ^6.3.0`.
 
 ```powershell
 cd eden_mobility_passager

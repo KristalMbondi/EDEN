@@ -2,12 +2,13 @@
 ///
 /// Les écrans ne connaissent QUE ces interfaces. Aujourd'hui elles sont
 /// implémentées par `MockBackend` (lib/data/mock). Demain, il suffira
-/// d'écrire `ApiAuthRepository`, `ApiWalletRepository`, `ApiTripRepository`
-/// (REST + Socket.io vers NestJS) et de changer les providers : aucun écran
-/// n'aura à être modifié. Voir docs/SPEC_APP_PASSAGER.md §5 (contrat API).
+/// d'écrire les versions `Api…` (REST + Socket.io vers NestJS) et de changer
+/// les providers : aucun écran n'aura à être modifié.
+/// Voir docs/SPEC_APP_PASSAGER.md §5 (contrat API proposé).
 library;
 
 import '../domain/models/fare_estimate.dart';
+import '../domain/models/favorite_place.dart';
 import '../domain/models/place.dart';
 import '../domain/models/rules_config.dart';
 import '../domain/models/session.dart';
@@ -17,18 +18,35 @@ import '../domain/models/wallet_transaction.dart';
 import '../domain/rules/cancellation.dart';
 import '../domain/rules/wallet_check.dart';
 
-/// Module Auth (CdC §2.2 Inscription : téléphone → OTP SMS → compte).
+/// Module Auth + Users (CdC §2.2 Inscription : téléphone → OTP SMS → compte).
 abstract class AuthRepository {
   Future<void> requestOtp(String phone);
 
   /// Lève `AppException('err_otp_invalid')` si le code est faux.
   Future<Session> verifyOtp(String phone, String code);
 
-  Future<Session> giveConsent();
+  /// Consentement explicite + prénom facultatif.
+  Future<Session> completeProfile({required String? firstName});
+
+  Future<Session> updateFirstName(String? firstName);
 
   Future<Session> updateEmergencyContact(String phone);
 
   Future<void> logout();
+}
+
+/// Lieux favoris (décision du 08/10/2026).
+abstract class FavoritesRepository {
+  Stream<List<FavoritePlace>> watchFavorites();
+
+  /// Maison et Bureau sont uniques : les enregistrer remplace l'existant.
+  Future<FavoritePlace> saveFavorite({
+    required FavoriteKind kind,
+    required Place place,
+    String? customName,
+  });
+
+  Future<void> deleteFavorite(String id);
 }
 
 /// Module Wallet + Payments.
@@ -47,27 +65,34 @@ abstract class WalletRepository {
     required int amount,
   });
 
+  /// Course immédiate : solde suffisant, crédit d'urgence ou refus.
   Future<WalletCheckResult> checkWallet(int estimatedPrice);
+
+  /// Réservation : solde suffisant ou refus.
+  Future<WalletCheckResult> checkWalletForReservation(int estimatedPrice);
 }
 
 /// Modules Trips + Pricing + Geo.
 abstract class TripRepository {
   Future<AppRulesConfig> fetchConfig();
 
-  Future<FareEstimate> estimate(Place pickup, Place destination);
+  /// Une estimation par gamme de véhicule (Éco, Confort).
+  Future<List<FareEstimate>> estimate(Place pickup, Place destination);
 
-  /// Lève `AppException` si le wallet refuse la commande.
+  /// `scheduledAt` null = course immédiate ; sinon réservation.
+  /// Lève `AppException` si le wallet refuse ou si l'heure est invalide.
   Future<Trip> requestTrip({
     required Place pickup,
     required Place destination,
     required FareEstimate estimate,
     required bool useEmergencyCredit,
+    DateTime? scheduledAt,
   });
 
   /// Suivi temps réel d'une course (Socket.io en production).
   Stream<Trip> watchTrip(String tripId);
 
-  /// Historique, du plus récent au plus ancien.
+  /// Historique et réservations, du plus récent au plus ancien.
   Stream<List<Trip>> watchHistory();
 
   Future<CancellationQuote> quoteCancellation(String tripId);

@@ -38,6 +38,9 @@ CancellationQuote computeCancellationQuote({
   required CancellationConfig config,
 }) {
   switch (status) {
+    // Réservation en attente et recherche : avant toute acceptation chauffeur,
+    // donc gratuit (CdC §3.2).
+    case TripStatus.scheduled:
     case TripStatus.searching:
       return CancellationQuote.free;
     case TripStatus.driverAssigned:
