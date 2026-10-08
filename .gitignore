@@ -1,0 +1,15 @@
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock.bak
+*.iml
+.idea/
+.vscode/
+# Plateformes générées localement par `flutter create .`
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/Flutter/Generated.xcconfig

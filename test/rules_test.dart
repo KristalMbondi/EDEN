@@ -25,8 +25,8 @@ void main() {
     });
 
     test('arrondi à l\'unité FCFA la plus proche', () {
-      // 400 + 300 × 2,345 = 1103,5 → 1104
-      expect(computeFare(distanceKm: 2.345, config: pricing), 1104);
+      // 400 + 300 × 3,345 = 1403,5 → 1404 (au-dessus du minimum de 1200)
+      expect(computeFare(distanceKm: 3.345, config: pricing), 1404);
     });
 
     test('distance négative refusée', () {
