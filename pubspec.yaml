@@ -1,0 +1,53 @@
+name: eden_mobility_passager
+description: >-
+  Application passager VTC - TACO EDEN MOBILITY.
+  MVP conforme au cahier des charges v1.0 (10/08/2026, statut "a valider").
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  # Etat de l'application (sans generation de code)
+  flutter_riverpod: ^2.5.1
+  # Navigation declarative + redirections (connexion / consentement)
+  go_router: ^14.2.0
+  # Carte OpenStreetMap (pas de cle API necessaire en developpement)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  # Position GPS du passager
+  geolocator: ^13.0.1
+  # Appel telephonique (bouton SOS -> contact d'urgence)
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  # Genere les icones Android / iOS / Web a partir du logo
+  flutter_launcher_icons: ^0.13.1
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/branding/
+
+# Commande : dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/app_icon.png"
+  # Icone adaptative Android 8+ : logo sur fond blanc
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/branding/app_icon_foreground.png"
+  web:
+    generate: true
+    image_path: "assets/branding/app_icon.png"
+    background_color: "#FFFFFF"
+    theme_color: "#1582C3"
