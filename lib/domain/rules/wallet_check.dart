@@ -19,6 +19,10 @@ enum RefusalReason {
   creditAlreadyUsedThisWeek,
   creditCapExceeded,
   platformCreditSuspended,
+
+  /// Réservation : le solde doit couvrir l'estimation (pas de crédit
+  /// d'urgence sur une réservation — voir evaluateReservationWallet).
+  insufficientForReservation,
 }
 
 class WalletCheckResult {
@@ -91,4 +95,31 @@ WalletCheckResult checkWalletForTrip({
     );
   }
   return WalletCheckResult(WalletDecision.emergencyCredit, shortfall: shortfall);
+}
+
+/// Vérification du wallet pour une RÉSERVATION (décision du 08/10/2026 :
+/// « vérification à la réservation, débit en fin de course »).
+///
+/// CHOIX À VALIDER : le crédit d'urgence n'est pas proposé pour une
+/// réservation. Il est limité à une utilisation par 7 jours et sert un
+/// besoin immédiat ; l'engager plusieurs heures à l'avance n'a pas été
+/// demandé. Le solde doit donc couvrir le prix estimé.
+WalletCheckResult evaluateReservationWallet({
+  required Wallet wallet,
+  required int estimatedPrice,
+}) {
+  if (wallet.isBlocked) {
+    return const WalletCheckResult(
+      WalletDecision.refused,
+      reason: RefusalReason.accountBlocked,
+    );
+  }
+  if (wallet.balance >= estimatedPrice) {
+    return const WalletCheckResult(WalletDecision.sufficient);
+  }
+  return WalletCheckResult(
+    WalletDecision.refused,
+    shortfall: estimatedPrice - wallet.balance,
+    reason: RefusalReason.insufficientForReservation,
+  );
 }

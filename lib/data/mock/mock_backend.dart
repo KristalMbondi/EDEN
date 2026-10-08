@@ -7,14 +7,17 @@ import '../../core/config/app_config.dart';
 import '../../core/utils/geo.dart';
 import '../../domain/errors.dart';
 import '../../domain/models/fare_estimate.dart';
+import '../../domain/models/favorite_place.dart';
 import '../../domain/models/place.dart';
 import '../../domain/models/rules_config.dart';
 import '../../domain/models/session.dart';
 import '../../domain/models/trip.dart';
+import '../../domain/models/vehicle_category.dart';
 import '../../domain/models/wallet.dart';
 import '../../domain/models/wallet_transaction.dart';
 import '../../domain/rules/cancellation.dart';
 import '../../domain/rules/pricing.dart';
+import '../../domain/rules/reservation.dart';
 import '../../domain/rules/wallet_check.dart';
 import '../repositories.dart';
 
@@ -25,6 +28,11 @@ class SimulationSettings {
   bool forceFareOverrun = false;
   bool eligibleForEmergencyCredit = false;
   bool platformCreditSuspended = false;
+
+  /// Réservations accélérées : l'alerte « solde insuffisant » arrive après
+  /// 10 s et la recherche du chauffeur après 20 s, au lieu de 30 et 15 min
+  /// avant l'heure choisie. Uniquement pour tester.
+  bool fastReservations = false;
 }
 
 /// HYPOTHÈSES de la simulation (le vrai calcul est fait par le module Geo
@@ -38,9 +46,11 @@ double estimateRoadDistanceKm(LatLng a, LatLng b) => haversineKm(a, b) * _detour
 
 int estimateDurationMin(double km) => math.max(1, (km / _avgSpeedKmh * 60).ceil());
 
-/// Faux backend en mémoire. Implémente les 3 contrats pour que toute
+/// Faux backend en mémoire. Implémente tous les contrats pour que
 /// l'application soit utilisable et testable AVANT l'API NestJS.
-class MockBackend implements AuthRepository, WalletRepository, TripRepository {
+/// Tout est perdu à la fermeture de l'application.
+class MockBackend
+    implements AuthRepository, FavoritesRepository, WalletRepository, TripRepository {
   MockBackend({AppRulesConfig? rules, DateTime Function()? clock})
       : rules = rules ?? AppConfig.demoRules,
         _now = clock ?? DateTime.now;
@@ -50,12 +60,20 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
   final SimulationSettings sim = SimulationSettings();
   final math.Random _rng = math.Random();
 
-  static const _demoDriver = DriverInfo(
-    name: 'Chauffeur Démo',
-    rating: 4.8,
-    vehicleModel: 'Véhicule de démonstration',
-    plate: 'DEMO-001',
-  );
+  static const _demoDrivers = {
+    VehicleCategory.eco: DriverInfo(
+      name: 'Chauffeur Démo',
+      rating: 4.8,
+      vehicleModel: 'Éco · véhicule de démonstration',
+      plate: 'DEMO-001',
+    ),
+    VehicleCategory.confort: DriverInfo(
+      name: 'Chauffeur Démo',
+      rating: 4.9,
+      vehicleModel: 'Confort · véhicule de démonstration',
+      plate: 'DEMO-002',
+    ),
+  };
 
   Session? _session;
   int _balance = 0; // CdC §2.2 : wallet créé avec un solde de 0
@@ -63,6 +81,7 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
   final List<WalletTransaction> _ledger = [];
   final Map<String, Trip> _trips = {};
   final Map<String, Timer> _timers = {};
+  final List<FavoritePlace> _favorites = [];
   final List<String> incidentsLog = [];
   int _seq = 0;
 
@@ -70,6 +89,7 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
   final _ledgerCtrl = StreamController<List<WalletTransaction>>.broadcast();
   final _tripCtrl = StreamController<Trip>.broadcast();
   final _historyCtrl = StreamController<List<Trip>>.broadcast();
+  final _favoritesCtrl = StreamController<List<FavoritePlace>>.broadcast();
 
   String _newId(String prefix) => '$prefix-${++_seq}';
 
@@ -90,9 +110,26 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
   }
 
   @override
-  Future<Session> giveConsent() async {
+  Future<Session> completeProfile({required String? firstName}) async {
     await _latency(200);
-    return _session = _requireSession().copyWith(consentAt: _now());
+    final name = _cleanName(firstName);
+    return _session = _requireSession().copyWith(
+      consentAt: _now(),
+      firstName: name,
+      clearFirstName: name == null,
+    );
+  }
+
+  @override
+  Future<Session> updateFirstName(String? firstName) async {
+    await _latency(200);
+    final name = _cleanName(firstName);
+    return _session = _requireSession().copyWith(firstName: name, clearFirstName: name == null);
+  }
+
+  String? _cleanName(String? raw) {
+    final t = raw?.trim() ?? '';
+    return t.isEmpty ? null : t;
   }
 
   @override
@@ -110,6 +147,47 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
     final s = _session;
     if (s == null) throw const AppException('err_generic');
     return s;
+  }
+
+  // ----------------------------------------------------------- Favoris
+
+  @override
+  Stream<List<FavoritePlace>> watchFavorites() async* {
+    yield List.unmodifiable(_favorites);
+    yield* _favoritesCtrl.stream;
+  }
+
+  @override
+  Future<FavoritePlace> saveFavorite({
+    required FavoriteKind kind,
+    required Place place,
+    String? customName,
+  }) async {
+    await _latency(200);
+    final name = _cleanName(customName);
+    if (kind == FavoriteKind.custom && name == null) {
+      throw const AppException('err_favorite_name');
+    }
+    if (kind != FavoriteKind.custom) {
+      _favorites.removeWhere((f) => f.kind == kind);
+    }
+    final fav = FavoritePlace(
+      id: _newId('fav'),
+      kind: kind,
+      place: place,
+      customName: kind == FavoriteKind.custom ? name : null,
+    );
+    _favorites.add(fav);
+    _favorites.sort((a, b) => a.kind.index.compareTo(b.kind.index));
+    _favoritesCtrl.add(List.unmodifiable(_favorites));
+    return fav;
+  }
+
+  @override
+  Future<void> deleteFavorite(String id) async {
+    await _latency(150);
+    _favorites.removeWhere((f) => f.id == id);
+    _favoritesCtrl.add(List.unmodifiable(_favorites));
   }
 
   // -------------------------------------------------------------- Wallet
@@ -157,7 +235,14 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
     }
     // Simule l'attente de validation par code PIN sur le téléphone.
     await _latency(2500);
-    return _record(TransactionType.recharge, amount, operator: operator);
+    final tx = _record(TransactionType.recharge, amount, operator: operator);
+    // Une recharge peut lever l'alerte « solde insuffisant » d'une réservation.
+    for (final t in _trips.values.toList()) {
+      if (t.status == TripStatus.scheduled && t.lowBalanceWarning && _balance >= t.estimate.price) {
+        _save(t.copyWith(lowBalanceWarning: false));
+      }
+    }
+    return tx;
   }
 
   @override
@@ -168,6 +253,12 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
       estimatedPrice: estimatedPrice,
       config: rules.emergencyCredit,
     );
+  }
+
+  @override
+  Future<WalletCheckResult> checkWalletForReservation(int estimatedPrice) async {
+    await _latency(200);
+    return evaluateReservationWallet(wallet: _wallet, estimatedPrice: estimatedPrice);
   }
 
   /// Ajoute une ligne au ledger (jamais de modification d'une ligne existante).
@@ -199,14 +290,19 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
   Future<AppRulesConfig> fetchConfig() async => rules;
 
   @override
-  Future<FareEstimate> estimate(Place pickup, Place destination) async {
+  Future<List<FareEstimate>> estimate(Place pickup, Place destination) async {
     await _latency();
     final km = estimateRoadDistanceKm(pickup.position, destination.position);
-    return FareEstimate(
-      distanceKm: km,
-      durationMin: estimateDurationMin(km),
-      price: computeFare(distanceKm: km, config: rules.pricing),
-    );
+    final minutes = estimateDurationMin(km);
+    return [
+      for (final c in VehicleCategory.values)
+        FareEstimate(
+          category: c,
+          distanceKm: km,
+          durationMin: minutes,
+          price: computeFare(distanceKm: km, config: rules.pricingFor(c)),
+        ),
+    ];
   }
 
   @override
@@ -215,10 +311,36 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
     required Place destination,
     required FareEstimate estimate,
     required bool useEmergencyCredit,
+    DateTime? scheduledAt,
   }) async {
     await _latency();
-    // Le backend refait TOUJOURS la vérification (ne jamais faire confiance
-    // au client).
+    // Le backend refait TOUJOURS les vérifications (ne jamais faire
+    // confiance au client).
+    if (scheduledAt != null) {
+      final error = validateReservationTime(
+        scheduledAt: scheduledAt,
+        now: _now(),
+        config: rules.reservation,
+      );
+      if (error != null) throw AppException('err_reservation_${error.name}');
+      final check = evaluateReservationWallet(wallet: _wallet, estimatedPrice: estimate.price);
+      if (check.decision != WalletDecision.sufficient) {
+        throw const AppException('err_wallet_refused');
+      }
+      final trip = Trip(
+        id: _newId('trip'),
+        pickup: pickup,
+        destination: destination,
+        status: TripStatus.scheduled,
+        estimate: estimate,
+        createdAt: _now(),
+        scheduledAt: scheduledAt,
+      );
+      _save(trip);
+      _scheduleReservation(trip);
+      return trip;
+    }
+
     final check = checkWalletForTrip(
       wallet: _wallet,
       estimatedPrice: estimate.price,
@@ -288,7 +410,7 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
     if (quote.outcome == CancellationOutcome.notAllowed) {
       throw const AppException('err_cancel_not_allowed');
     }
-    _timers.remove(tripId)?.cancel();
+    _cancelTimers(tripId);
     if (quote.fee > 0) {
       _record(TransactionType.cancellationFee, -quote.fee, tripId: tripId);
     }
@@ -339,6 +461,49 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
     return next;
   }
 
+  void _cancelTimers(String id) {
+    _timers.remove(id)?.cancel();
+    _timers.remove('$id-alert')?.cancel();
+  }
+
+  /// Réservation : alerte solde 30 min avant, recherche 15 min avant.
+  void _scheduleReservation(Trip trip) {
+    final at = trip.scheduledAt!;
+    final now = _now();
+    Duration until(Duration before) {
+      final d = at.subtract(before).difference(now);
+      return d.isNegative ? Duration.zero : d;
+    }
+
+    final alertIn = sim.fastReservations
+        ? const Duration(seconds: 10)
+        : until(rules.reservation.balanceAlertBefore);
+    final searchIn = sim.fastReservations
+        ? const Duration(seconds: 20)
+        : until(rules.reservation.searchStartBefore);
+
+    _timers['${trip.id}-alert'] = Timer(alertIn, () {
+      final t = _trips[trip.id];
+      if (t == null || t.status != TripStatus.scheduled) return;
+      if (_balance < t.estimate.price) {
+        // En production : notification push au passager.
+        _save(t.copyWith(lowBalanceWarning: true));
+      }
+    });
+
+    _timers[trip.id] = Timer(searchIn, () {
+      final t = _trips[trip.id];
+      if (t == null || t.status != TripStatus.scheduled) return;
+      final check = evaluateReservationWallet(wallet: _wallet, estimatedPrice: t.estimate.price);
+      if (check.decision != WalletDecision.sufficient) {
+        _save(t.copyWith(status: TripStatus.cancelledInsufficientBalance));
+        return;
+      }
+      _save(t.copyWith(status: TripStatus.searching));
+      _scheduleMatching(t.id);
+    });
+  }
+
   void _scheduleMatching(String id) {
     final delay = sim.noDriverAvailable ? rules.searchTimeout : const Duration(seconds: 6);
     _timers[id] = Timer(delay, () {
@@ -352,7 +517,7 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
       final start = LatLng(t.pickup.position.latitude + 0.010, t.pickup.position.longitude + 0.008);
       _save(t.copyWith(
         status: TripStatus.driverAssigned,
-        driver: _demoDriver,
+        driver: _demoDrivers[t.category],
         driverPosition: start,
         acceptedAt: _now(),
       ));
@@ -408,7 +573,8 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
     // Le prix final réel est recalculé par le backend sur le trajet réel.
     // Simulation : estimation + 0 à 15 %, ou +40 % si on force le dépassement.
     final factor = sim.forceFareOverrun ? 1.4 : 1.0 + _rng.nextDouble() * 0.15;
-    final finalPrice = math.max((t.estimate.price * factor).round(), rules.pricing.minimumFare);
+    final minimum = rules.pricingFor(t.category).minimumFare;
+    final finalPrice = math.max((t.estimate.price * factor).round(), minimum);
     _record(TransactionType.tripPayment, -finalPrice, tripId: id);
     if (t.paidWithEmergencyCredit) {
       _lastEmergencyCreditUse = _now();
@@ -429,5 +595,6 @@ class MockBackend implements AuthRepository, WalletRepository, TripRepository {
     _ledgerCtrl.close();
     _tripCtrl.close();
     _historyCtrl.close();
+    _favoritesCtrl.close();
   }
 }

@@ -1,7 +1,10 @@
 import 'package:eden_mobility_passager/core/l10n/strings.dart';
+import 'package:eden_mobility_passager/domain/models/favorite_place.dart';
 import 'package:eden_mobility_passager/domain/models/trip.dart';
+import 'package:eden_mobility_passager/domain/models/vehicle_category.dart';
 import 'package:eden_mobility_passager/domain/models/wallet.dart';
 import 'package:eden_mobility_passager/domain/models/wallet_transaction.dart';
+import 'package:eden_mobility_passager/domain/rules/reservation.dart';
 import 'package:eden_mobility_passager/domain/rules/wallet_check.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -20,9 +23,14 @@ void main() {
       for (final c in EmergencyCreditStatus.values) 'credit_${c.name}',
       for (final t in TransactionType.values) 'tx_${t.name}',
       for (final o in MobileMoneyOperator.values) 'op_${o.name}',
+      for (final c in VehicleCategory.values) 'cat_${c.name}',
+      for (final e in ReservationError.values) 'err_reservation_${e.name}',
+      for (final f in FavoriteKind.values)
+        if (f != FavoriteKind.custom) 'fav_${f.name}',
     ];
     for (final k in keys) {
       expect(appStrings['fr']!.containsKey(k), isTrue, reason: k);
+      expect(appStrings['en']!.containsKey(k), isTrue, reason: k);
     }
   });
 }

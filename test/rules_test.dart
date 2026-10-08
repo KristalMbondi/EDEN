@@ -6,6 +6,7 @@ import 'package:eden_mobility_passager/domain/models/trip.dart';
 import 'package:eden_mobility_passager/domain/models/wallet.dart';
 import 'package:eden_mobility_passager/domain/rules/cancellation.dart';
 import 'package:eden_mobility_passager/domain/rules/pricing.dart';
+import 'package:eden_mobility_passager/domain/rules/reservation.dart';
 import 'package:eden_mobility_passager/domain/rules/wallet_check.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -25,8 +26,8 @@ void main() {
     });
 
     test('arrondi à l\'unité FCFA la plus proche', () {
-      // 400 + 300 × 2,345 = 1103,5 → 1104
-      expect(computeFare(distanceKm: 2.345, config: pricing), 1104);
+      // 400 + 300 × 3,345 = 1403,5 → 1404 (au-dessus du minimum de 1200)
+      expect(computeFare(distanceKm: 3.345, config: pricing), 1404);
     });
 
     test('distance négative refusée', () {
@@ -171,6 +172,74 @@ void main() {
       for (final s in TripStatus.values) {
         expect(allowedTripTransitions.containsKey(s), isTrue, reason: s.name);
       }
+    });
+  });
+
+  group('Réservation — décision du 08/10/2026 (1 h – 24 h)', () {
+    const cfg = ReservationConfig();
+    final now = DateTime(2026, 10, 8, 13, 47);
+
+    test('59 min avant : trop tôt', () {
+      expect(
+        validateReservationTime(scheduledAt: now.add(const Duration(minutes: 59)), now: now, config: cfg),
+        ReservationError.tooSoon,
+      );
+    });
+
+    test('1 h pile et 24 h pile : acceptées (bornes incluses)', () {
+      expect(validateReservationTime(scheduledAt: now.add(const Duration(hours: 1)), now: now, config: cfg), isNull);
+      expect(validateReservationTime(scheduledAt: now.add(const Duration(hours: 24)), now: now, config: cfg), isNull);
+    });
+
+    test('24 h et 1 min : trop tard', () {
+      expect(
+        validateReservationTime(
+            scheduledAt: now.add(const Duration(hours: 24, minutes: 1)), now: now, config: cfg),
+        ReservationError.tooLate,
+      );
+    });
+
+    test('créneaux : quarts d\'heure, tous valides', () {
+      final slots = reservationSlots(now: now, config: cfg);
+      // 13:47 + 1 h = 14:47 → premier quart d'heure valide : 15:00
+      expect(slots.first, DateTime(2026, 10, 8, 15, 0));
+      // dernier ≤ 13:47 le lendemain → 13:45
+      expect(slots.last, DateTime(2026, 10, 9, 13, 45));
+      for (final s in slots) {
+        expect(s.minute % 15, 0);
+        expect(validateReservationTime(scheduledAt: s, now: now, config: cfg), isNull);
+      }
+    });
+
+    test('annulation d\'une réservation : gratuite', () {
+      final q = computeCancellationQuote(
+        status: TripStatus.scheduled,
+        acceptedAt: null,
+        now: now,
+        config: const CancellationConfig(feePerMinute: 50),
+      );
+      expect(q.outcome, CancellationOutcome.free);
+    });
+
+    test('wallet : solde suffisant exigé, pas de crédit d\'urgence', () {
+      expect(
+        evaluateReservationWallet(wallet: const Wallet(balance: 2000), estimatedPrice: 2000).decision,
+        WalletDecision.sufficient,
+      );
+      final r = evaluateReservationWallet(
+        wallet: const Wallet(balance: 500, emergencyCreditStatus: EmergencyCreditStatus.eligible),
+        estimatedPrice: 2000,
+      );
+      expect(r.decision, WalletDecision.refused);
+      expect(r.reason, RefusalReason.insufficientForReservation);
+      expect(r.shortfall, 1500);
+    });
+
+    test('transitions d\'une réservation', () {
+      expect(canTransition(TripStatus.scheduled, TripStatus.searching), isTrue);
+      expect(canTransition(TripStatus.scheduled, TripStatus.cancelledInsufficientBalance), isTrue);
+      expect(canTransition(TripStatus.scheduled, TripStatus.completed), isFalse);
+      expect(TripStatus.scheduled.isActive, isFalse);
     });
   });
 }

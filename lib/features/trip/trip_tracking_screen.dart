@@ -6,15 +6,17 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/l10n/app_localizations.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/ui/components.dart';
 import '../../core/utils/formatters.dart';
 import '../../domain/models/trip.dart';
 import '../../domain/rules/cancellation.dart';
 import '../../providers.dart';
+import '../booking/place_picker_screen.dart';
 import '../common/eden_map.dart';
 import '../common/ui_helpers.dart';
 
 /// Écran de suivi (CdC §2.2 « Pendant la course », §4.3) :
-/// position du chauffeur en temps réel, infos chauffeur, numéros masqués,
+/// position du chauffeur en temps réel, fiche chauffeur, numéros masqués,
 /// bouton SOS visible en permanence.
 class TripTrackingScreen extends ConsumerStatefulWidget {
   const TripTrackingScreen({super.key, required this.tripId});
@@ -36,13 +38,13 @@ class _TripTrackingScreenState extends ConsumerState<TripTrackingScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.sos, color: AppColors.sos, size: 40),
+        icon: const Icon(Icons.sos_rounded, color: AppColors.sos, size: 40),
         title: Text(context.tr('sos_title')),
         content: Text(context.tr('sos_confirm')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.tr('common_cancel'))),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.sos, minimumSize: const Size(0, 44)),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.sos),
             onPressed: () => Navigator.pop(context, true),
             child: Text(context.tr('sos_send')),
           ),
@@ -90,7 +92,11 @@ class _TripTrackingScreenState extends ConsumerState<TripTrackingScreen> {
           content: Text(message),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false), child: Text(context.tr('cancel_keep'))),
-            TextButton(onPressed: () => Navigator.pop(context, true), child: Text(context.tr('cancel_confirm'))),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: AppColors.sos),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(context.tr('cancel_confirm')),
+            ),
           ],
         ),
       );
@@ -153,29 +159,17 @@ class _TripTrackingScreenState extends ConsumerState<TripTrackingScreen> {
   }
 
   Widget _buildTrip(BuildContext context, Trip trip) {
+    final eden = context.eden;
     final driverPos = trip.driverPosition;
     final target = trip.status == TripStatus.inProgress ? trip.destination.position : trip.pickup.position;
     final route = <LatLng>[if (driverPos != null) driverPos, target];
     final canCancel = trip.status == TripStatus.driverAssigned || trip.status == TripStatus.driverArrived;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(tripStatusLabel(context, trip.status)),
-        leading: IconButton(icon: const Icon(Icons.close), onPressed: () => context.go('/home')),
-      ),
-      // SOS visible en permanence pendant la course.
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'sos',
-        backgroundColor: AppColors.sos,
-        foregroundColor: Colors.white,
-        onPressed: () => _sos(trip),
-        icon: const Icon(Icons.sos),
-        label: Text(context.tr('sos_button')),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
+          Positioned.fill(
+            bottom: 280,
             child: EdenMap(
               center: trip.pickup.position,
               fitPoints: [trip.pickup.position, trip.destination.position, if (driverPos != null) driverPos],
@@ -183,15 +177,45 @@ class _TripTrackingScreenState extends ConsumerState<TripTrackingScreen> {
               markers: [
                 pinMarker(trip.pickup.position, color: AppColors.primary, icon: Icons.my_location),
                 pinMarker(trip.destination.position, color: AppColors.accent),
-                if (driverPos != null)
-                  pinMarker(driverPos, color: Colors.black87, icon: Icons.local_taxi),
+                if (driverPos != null) pinMarker(driverPos, color: AppColors.primary, icon: Icons.local_taxi_rounded),
               ],
             ),
           ),
+          // Haut : retour + statut + SOS (visible en permanence).
           SafeArea(
-            top: false,
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  MapRoundButton(icon: Icons.close_rounded, onTap: () => context.go('/home')),
+                  const Spacer(),
+                  EdenCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    child: Text(tripStatusLabel(context, trip.status),
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  ),
+                  const Spacer(),
+                  Material(
+                    color: AppColors.sos,
+                    shape: const StadiumBorder(),
+                    elevation: 3,
+                    child: InkWell(
+                      customBorder: const StadiumBorder(),
+                      onTap: () => _sos(trip),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        child: Text(context.tr('sos_button'),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: BottomPanel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -204,17 +228,31 @@ class _TripTrackingScreenState extends ConsumerState<TripTrackingScreen> {
                     const SizedBox(height: 12),
                   ],
                   if (trip.status == TripStatus.driverArrived) ...[
-                    InfoBanner(text: context.tr('trip_driver_arrived_hint'), icon: Icons.emoji_people),
+                    InfoBanner(
+                      text: context.tr('trip_driver_arrived_hint'),
+                      icon: Icons.emoji_people_rounded,
+                      color: AppColors.accent,
+                    ),
                     const SizedBox(height: 12),
                   ],
                   if (trip.driver != null) _DriverCard(trip: trip, onCall: _callDriver),
                   const SizedBox(height: 12),
-                  Text(
-                    '${context.tr('trip_estimated')} : ${formatXaf(trip.estimate.price)}',
-                    textAlign: TextAlign.center,
+                  // Trajet
+                  _RouteLine(from: trip.pickup.label, to: trip.destination.label),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(categoryIcon(trip.category), size: 18, color: eden.muted),
+                      const SizedBox(width: 6),
+                      Text(categoryLabel(context, trip.category), style: TextStyle(color: eden.muted)),
+                      const Spacer(),
+                      Text('${context.tr('trip_estimated')} : ',
+                          style: TextStyle(color: eden.muted, fontSize: 13)),
+                      Text(formatXaf(trip.estimate.price), style: const TextStyle(fontWeight: FontWeight.w700)),
+                    ],
                   ),
                   if (canCancel) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     OutlinedButton(
                       onPressed: _busy ? null : () => _cancel(trip),
                       child: Text(context.tr('cancel_title')),
@@ -240,18 +278,88 @@ class _DriverCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final d = trip.driver!;
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(child: Text(d.name.isNotEmpty ? d.name[0] : '?')),
-        title: Text('${d.name}  ★ ${d.rating.toStringAsFixed(1)}'),
-        subtitle: Text('${d.vehicleModel}\n${context.tr('trip_plate')} : ${d.plate}'),
-        isThreeLine: true,
-        trailing: IconButton(
-          icon: const Icon(Icons.phone),
-          tooltip: context.tr('trip_call_driver'),
-          onPressed: onCall,
-        ),
+    final eden = context.eden;
+    return EdenCard(
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        children: [
+          AvatarInitial(name: d.name, size: 52),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(d.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded, size: 16, color: AppColors.warning),
+                    const SizedBox(width: 2),
+                    Text(d.rating.toStringAsFixed(1), style: const TextStyle(fontSize: 13)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(d.vehicleModel, style: TextStyle(color: eden.muted, fontSize: 12.5)),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: eden.primarySoft,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(d.plate,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, letterSpacing: 1, color: AppColors.primary, fontSize: 12)),
+                ),
+              ],
+            ),
+          ),
+          Material(
+            color: eden.accentSoft,
+            shape: const CircleBorder(),
+            child: IconButton(
+              tooltip: context.tr('trip_call_driver'),
+              icon: const Icon(Icons.phone_rounded, color: AppColors.accent),
+              onPressed: onCall,
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Départ → destination sous forme de deux lignes reliées.
+class _RouteLine extends StatelessWidget {
+  const _RouteLine({required this.from, required this.to});
+
+  final String from;
+  final String to;
+
+  @override
+  Widget build(BuildContext context) {
+    final eden = context.eden;
+    return Row(
+      children: [
+        Column(
+          children: [
+            const Icon(Icons.radio_button_checked, size: 16, color: AppColors.primary),
+            Container(width: 2, height: 18, color: eden.border),
+            const Icon(Icons.place_rounded, size: 18, color: AppColors.accent),
+          ],
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(from, maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 14),
+              Text(to, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

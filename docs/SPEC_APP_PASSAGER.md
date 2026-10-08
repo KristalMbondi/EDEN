@@ -124,3 +124,26 @@ L'annexe « Application EDEN Mobility » (mai 2026) mentionne : flotte **électr
 - Prix final = estimation + 0 à 15 % (ou + 40 % avec l'interrupteur « dépassement »).
 - Recharge validée en 2,5 s.
 - Interrupteurs du **Profil › Mode démo** : aucun chauffeur, dépassement, éligibilité au crédit, suspension globale des crédits.
+
+## 9. Décisions du 08/10/2026 (hors CdC v1.0)
+
+Ces évolutions ont été demandées en s'inspirant de deux maquettes Dribbble (« Ride Sharing Mobile App UI » de Juice Lab et « Taxi mobile app » de Ledo). Elles **dépassent le CdC v1.0** : le CdC devra être mis à jour pour qu'elles fassent foi.
+
+| Sujet | Décision | Écart avec le CdC |
+|---|---|---|
+| Style | Base claire et aérée (maquette 1) + écrans de la maquette 2 ; police Poppins ; thèmes clair et sombre (suit le téléphone) ; carte OpenStreetMap standard | CdC muet sur le design |
+| Couleurs | Celles du logo : bleu `#1582C3` (boutons principaux), vert `#43B381` (accents) | — |
+| Écrans d'introduction | 3 écrans, affichés une seule fois | Ajout |
+| Prénom | Demandé à l'inscription, **facultatif** ; accueil « Bonjour [prénom] » | Ajout (CdC : téléphone seul) |
+| Accueil | Tuiles Commander / Mon wallet / Mes courses | Ajout |
+| Lieux favoris | Maison + Bureau (uniques) + lieux libres nommés | Ajout |
+| Gammes | **Éco / Confort**, tarifs séparés (prise en charge, tarif/km, minimum par gamme) | **Contredit** le tarif unique du CdC §3.1 |
+| Visuels véhicules | Icônes simples | — |
+| Réservation | Entre **1 h et 24 h** à l'avance ; solde vérifié à la réservation, débit en fin de course ; alerte « solde insuffisant » **30 min** avant ; recherche chauffeur **15 min** avant ; si le solde est toujours insuffisant à ce moment : annulation **sans frais** | Ajout |
+| Exclus | Paiement espèces/carte, pourboire, services colis/repas | Conforme au CdC (wallet seul, chauffeurs salariés, pas de marchandises) |
+
+**Choix pris faute de précision (à valider) :**
+- Le **crédit d'urgence n'est pas utilisable pour une réservation** : le solde doit couvrir le prix estimé. Motif : il est limité à 1 fois / 7 jours et sert un besoin immédiat.
+- L'annulation d'une réservation **avant l'acceptation d'un chauffeur est gratuite** (même règle que le CdC §3.2 avant acceptation).
+- Les **créneaux de réservation** sont proposés tous les quarts d'heure (pas de saisie libre de l'heure).
+- Les **tarifs Confort** de démonstration (800 FCFA + 350 FCFA/km, minimum 1 500 FCFA) sont **fictifs**, comme ceux d'Éco.

@@ -24,6 +24,8 @@ dependencies:
   geolocator: ^13.0.1
   # Appel telephonique (bouton SOS -> contact d'urgence)
   url_launcher: ^6.3.0
+  # Memorise localement : ecrans d'introduction deja vus
+  shared_preferences: ^2.2.3
 
 dev_dependencies:
   flutter_test:
@@ -36,6 +38,17 @@ flutter:
   uses-material-design: true
   assets:
     - assets/branding/
+  # Police Poppins (licence SIL OFL 1.1, voir assets/fonts/OFL.txt)
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
 
 # Commande : dart run flutter_launcher_icons
 flutter_launcher_icons:

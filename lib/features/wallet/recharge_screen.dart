@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/l10n/app_localizations.dart';
+import '../../core/theme/app_theme.dart';
+import '../../core/ui/components.dart';
 import '../../core/utils/formatters.dart';
 import '../../domain/models/wallet_transaction.dart';
 import '../../providers.dart';
@@ -79,15 +81,34 @@ class _RechargeScreenState extends ConsumerState<RechargeScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(context.tr('wallet_recharge'))),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         children: [
-          SegmentedButton<MobileMoneyOperator>(
-            segments: [
-              for (final op in MobileMoneyOperator.values)
-                ButtonSegment(value: op, label: Text(operatorLabel(context, op))),
+          Text(context.tr('recharge_operator'), style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final op in MobileMoneyOperator.values) ...[
+                if (op != MobileMoneyOperator.values.first) const SizedBox(width: 10),
+                Expanded(
+                  child: EdenCard(
+                    selected: _operator == op,
+                    color: _operator == op ? context.eden.primarySoft : null,
+                    onTap: _pending ? null : () => setState(() => _operator = op),
+                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                    child: Column(
+                      children: [
+                        Icon(Icons.phone_android_rounded,
+                            color: _operator == op ? AppColors.primary : context.eden.muted),
+                        const SizedBox(height: 6),
+                        Text(operatorLabel(context, op),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
-            selected: {_operator},
-            onSelectionChanged: _pending ? null : (s) => setState(() => _operator = s.first),
           ),
           const SizedBox(height: 16),
           TextField(
